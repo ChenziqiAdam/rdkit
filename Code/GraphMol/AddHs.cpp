@@ -8,6 +8,7 @@
 //  of the RDKit source tree.
 //
 #include "RDKitBase.h"
+#include <GraphMol/SanitizerMol.h>
 #include <list>
 #include "QueryAtom.h"
 #include "QueryOps.h"
@@ -531,6 +532,7 @@ bool isQueryAtom(const RWMol &mol, const Atom &atom) {
 }  // namespace
 void addHs(RWMol &mol, const AddHsParameters &params,
            const UINT_VECT *onlyOnAtoms) {
+  Sanitizer::CompositionGuard sanGuard("RDK-MO-001", mol, true, "addHs");
   // when we hit each atom, clear its computed properties
   // NOTE: it is essential that we not clear the ring info in the
   // molecule's computed properties.  We don't want to have to
@@ -1026,6 +1028,8 @@ void removeHs(RWMol &mol, const RemoveHsParameters &ps, bool sanitize) {
   for (auto atom : mol.atoms()) {
     atom->updatePropertyCache(false);
   }
+  Sanitizer::CompositionGuard sanGuard("RDK-MO-002", mol, true, "removeHs",
+                                       sanitize);
   if (ps.removeAndTrackIsotopes) {
     for (const auto &pair : getIsoMap(mol)) {
       mol.getAtomWithIdx(pair.first)

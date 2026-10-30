@@ -4,7 +4,7 @@ rdkit_library(GraphMol
         MacroAtomInfo.cpp
         MacroMol.cpp
         MacroMolTemplate.cpp
-        PeriodicTable.cpp
+        PeriodicTable.cpp SanitizerMol.cpp
         atomic_data.cpp QueryOps.cpp MolPickler.cpp Canon.cpp
         AtomIterators.cpp BondIterators.cpp Aromaticity.cpp Kekulize.cpp
         ConjugHybrid.cpp AddHs.cpp

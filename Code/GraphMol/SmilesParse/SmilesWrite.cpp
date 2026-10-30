@@ -9,6 +9,9 @@
 //
 #include "SmilesWrite.h"
 #include "SmilesParseOps.h"
+#include "SmilesParse.h"
+#include <GraphMol/SanitizerMol.h>
+#include <GraphMol/MolOps.h>
 #include <GraphMol/RDKitBase.h>
 #include <RDGeneral/types.h>
 #include <GraphMol/Canon.h>
@@ -754,9 +757,73 @@ std::string MolToSmiles(const ROMol &mol, const SmilesWriteParams &params,
 }  // namespace detail
 }  // namespace SmilesWrite
 
+namespace {
+// RDK-CN-001/002 observation (canonical output only, re-entrancy guarded)
+void sanitizeSmiles(const ROMol &mol, const SmilesWriteParams &params,
+                    const std::string &smi) {
+  static thread_local bool inside = false;
+  if (inside || !Sanitizer::enabled() || !params.canonical || params.doRandom ||
+      params.rootedAtAtom >= 0 || mol.getNumAtoms() == 0 ||
+      mol.getNumAtoms() > 100 || smi.empty()) {
+    return;
+  }
+  for (const auto a : mol.atoms()) {
+    if (a->hasQuery()) {
+      return;
+    }
+  }
+  for (const auto b : mol.bonds()) {
+    if (b->hasQuery() || b->getBondType() == Bond::DATIVE ||
+        b->getBondType() == Bond::DATIVEONE ||
+        b->getBondType() == Bond::HYDROGEN) {
+      return;
+    }
+  }
+  inside = true;
+  try {
+    // CN-001: the SMILES describes the same atoms, bonds and charge
+    const auto before = Sanitizer::compose(mol, true);
+    if (before.valid) {
+      std::unique_ptr<ROMol> back(SmilesToMol(smi));
+      if (back) {
+        const auto after = Sanitizer::compose(*back, true);
+        if (after.valid &&
+            (after.n != before.n || after.charge != before.charge ||
+             back->getNumAtoms() != mol.getNumAtoms() ||
+             back->getNumBonds() != mol.getNumBonds())) {
+          Sanitizer::report("RDK-CN-001", "SMILES " + smi + " parses to a different composition");
+        }
+      }
+    }
+    // CN-002: canonical SMILES does not depend on atom order
+    const unsigned int n = mol.getNumAtoms();
+    std::vector<unsigned int> perm(n);
+    for (unsigned int i = 0; i < n; ++i) {
+      perm[i] = i;
+    }
+    unsigned long long x = 88172645463325252ULL;
+    for (unsigned int i = n - 1; i > 0; --i) {
+      x ^= x << 13;
+      x ^= x >> 7;
+      x ^= x << 17;
+      std::swap(perm[i], perm[x % (i + 1)]);
+    }
+    std::unique_ptr<ROMol> renum(MolOps::renumberAtoms(mol, perm));
+    const std::string smi2 = SmilesWrite::detail::MolToSmiles(*renum, params, false);
+    if (smi2 != smi) {
+      Sanitizer::report("RDK-CN-002", smi + " vs " + smi2);
+    }
+  } catch (...) {
+  }
+  inside = false;
+}
+}  // namespace
+
 std::string MolToSmiles(const ROMol &mol, const SmilesWriteParams &params) {
   bool doingCXSmiles = false;
-  return SmilesWrite::detail::MolToSmiles(mol, params, doingCXSmiles);
+  auto res = SmilesWrite::detail::MolToSmiles(mol, params, doingCXSmiles);
+  sanitizeSmiles(mol, params, res);
+  return res;
 }
 
 std::string MolToCXSmiles(const ROMol &romol,

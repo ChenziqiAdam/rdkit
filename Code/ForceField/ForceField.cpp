@@ -12,6 +12,12 @@
 
 #include <RDGeneral/Invariant.h>
 #include <Numerics/Optimizer/BFGSOpt.h>
+#include <RDGeneral/Sanitizer.h>
+#include "PositionConstraint.h"
+#include <atomic>
+#include <cmath>
+#include <cstdio>
+#include <cstdlib>
 
 namespace RDKit {
 namespace ForceFieldsHelper {
@@ -147,6 +153,58 @@ class calcGradient {
 }  // namespace ForceFieldsHelper
 
 namespace ForceFields {
+namespace {
+// RDK-FF-001/002 observation: gradient of every contribution on a zeroed
+// buffer, so the caller's buffer is never touched (about one extra gradient).
+void sanitizeGradient(const ForceField &ff, const double *posIn) {
+  if (!RDKit::Sanitizer::enabled()) {
+    return;
+  }
+  const unsigned int P = ff.positions().size();
+  if (ff.dimension() != 3 || P == 0 || P > 500 || !ff.fixedPoints().empty()) {
+    return;
+  }
+  for (const auto &c : ff.contribs()) {
+    if (dynamic_cast<const PositionConstraintContrib *>(c.get())) {
+      return;
+    }
+  }
+  std::vector<double> pos(posIn, posIn + 3 * P), tot(3 * P, 0.0), g(3 * P);
+  double cen[3] = {0, 0, 0};
+  for (unsigned int i = 0; i < P; ++i) {
+    for (int d = 0; d < 3; ++d) {
+      cen[d] += pos[3 * i + d] / P;
+    }
+  }
+  double fscale = 0.0, tscale = 0.0;
+  for (const auto &c : ff.contribs()) {
+    std::fill(g.begin(), g.end(), 0.0);
+    c->getGrad(pos.data(), g.data());
+    for (unsigned int i = 0; i < P; ++i) {
+      double gn = std::sqrt(g[3 * i] * g[3 * i] + g[3 * i + 1] * g[3 * i + 1] +
+                            g[3 * i + 2] * g[3 * i + 2]);
+      double r = std::sqrt(std::pow(pos[3 * i] - cen[0], 2) +
+                           std::pow(pos[3 * i + 1] - cen[1], 2) +
+                           std::pow(pos[3 * i + 2] - cen[2], 2));
+      fscale += gn;
+      tscale += r * gn;
+      for (int d = 0; d < 3; ++d) {
+        tot[3 * i + d] += g[3 * i + d];
+      }
+    }
+  }
+  RDKit::Sanitizer::checkForceBalance(P, pos.data(), tot.data(), fscale,
+                                      tscale);
+}
+double sanitizeEnergy(const ForceField &ff, std::vector<double> &pts) {
+  double e = 0.0;
+  for (const auto &c : ff.contribs()) {
+    e += c->getEnergy(pts.data());
+  }
+  return e;
+}
+}  // namespace
+
 ForceField::~ForceField() {
   d_numPoints = 0;
   d_positions.clear();
@@ -269,6 +327,8 @@ int ForceField::minimize(unsigned int snapshotFreq,
   std::vector<double> points(dim);
 
   this->scatter(points.data());
+  const bool sanitize = RDKit::Sanitizer::enabled();
+  const double e0 = sanitize ? sanitizeEnergy(*this, points) : 0.0;
   ForceFieldsHelper::calcEnergy eCalc(this);
   ForceFieldsHelper::calcGradient gCalc(this);
 
@@ -276,6 +336,9 @@ int ForceField::minimize(unsigned int snapshotFreq,
                               finalForce, eCalc, gCalc, snapshotFreq,
                               snapshotVect, energyTol, maxIts);
   this->gather(points.data());
+  if (sanitize) {
+    RDKit::Sanitizer::checkEnergyDescent(e0, sanitizeEnergy(*this, points));
+  }
 
   return res;
 }
@@ -337,6 +400,7 @@ void ForceField::calcGrad(double *grad) const {
   for (const auto &d_contrib : d_contribs) {
     d_contrib->getGrad(pos, grad);
   }
+  sanitizeGradient(*this, pos);
   // zero out gradient values for any fixed points:
   for (int d_fixedPoint : d_fixedPoints) {
     CHECK_INVARIANT(static_cast<unsigned int>(d_fixedPoint) < d_numPoints,
@@ -359,6 +423,7 @@ void ForceField::calcGrad(double *pos, double *grad) {
   for (const auto &contrib : d_contribs) {
     contrib->getGrad(pos, grad);
   }
+  sanitizeGradient(*this, pos);
 
   for (const auto point : d_fixedPoints) {
     CHECK_INVARIANT(static_cast<std::size_t>(point) < d_numPoints,

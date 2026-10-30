@@ -12,6 +12,7 @@
 #include <Geometry/point.h>
 
 #include "PMI.h"
+#include <RDGeneral/Sanitizer.h>
 
 #include <Eigen/Dense>
 
@@ -116,6 +117,7 @@ double NPR1(const ROMol &mol, int confId, bool useAtomicMasses, bool force) {
   if (pm3 < 1e-8) {
     return 0.0;
   }
+  RDKit::Sanitizer::checkNPR(pm1, pm2, pm3);
   return pm1 / pm3;
 }
 double NPR2(const ROMol &mol, int confId, bool useAtomicMasses, bool force) {
@@ -128,6 +130,7 @@ double NPR2(const ROMol &mol, int confId, bool useAtomicMasses, bool force) {
   if (pm3 < 1e-8) {
     return 0.0;
   }
+  RDKit::Sanitizer::checkNPR(pm1, pm2, pm3);
   return pm2 / pm3;
 }
 double PMI1(const ROMol &mol, int confId, bool useAtomicMasses, bool force) {

@@ -19,6 +19,7 @@
 #include <Numerics/Alignment/AlignPoints.h>
 #include <GraphMol/MolTransforms/MolTransforms.h>
 #include <RDGeneral/RDThreads.h>
+#include <RDGeneral/Sanitizer.h>
 #include <algorithm>
 #include <boost/format.hpp>
 #include <iterator>
@@ -68,7 +69,16 @@ double alignConfsOnAtomMap(const Conformer &prbCnf, const Conformer &refCnf,
   }
   double ssr = RDNumeric::Alignments::AlignPoints(
       refPoints, prbPoints, trans, weights, reflect, maxIterations);
-  return ssr / static_cast<double>(prbPoints.size());
+  const double msd = ssr / static_cast<double>(prbPoints.size());
+  if (RDKit::Sanitizer::enabled() && !weights) {
+    std::vector<std::vector<double>> prb, ref;
+    for (size_t i = 0; i < prbPoints.size(); ++i) {
+      prb.push_back({prbPoints[i]->x, prbPoints[i]->y, prbPoints[i]->z});
+      ref.push_back({refPoints[i]->x, refPoints[i]->y, refPoints[i]->z});
+    }
+    RDKit::Sanitizer::checkAlignment(prb, ref, trans.getData(), reflect, msd);
+  }
+  return msd;
 }
 
 void getAllMatchesPrbRef(const ROMol &prbMol, const ROMol &refMol,

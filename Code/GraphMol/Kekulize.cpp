@@ -8,6 +8,7 @@
 //  of the RDKit source tree.
 //
 #include <GraphMol/RDKitBase.h>
+#include <GraphMol/SanitizerMol.h>
 #include <GraphMol/QueryOps.h>
 #include <GraphMol/new_canon.h>
 #include <GraphMol/Rings.h>
@@ -578,6 +579,7 @@ namespace details {
 void KekulizeFragment(RWMol &mol, const boost::dynamic_bitset<> &atomsToUse,
                       boost::dynamic_bitset<> bondsToUse, bool markAtomsBonds,
                       bool canonical, unsigned int maxBackTracks) {
+  Sanitizer::KekulizeGuard sanGuard(mol);
   PRECONDITION(atomsToUse.size() == mol.getNumAtoms(),
                "atomsToUse is wrong size");
   PRECONDITION(bondsToUse.size() == mol.getNumBonds(),

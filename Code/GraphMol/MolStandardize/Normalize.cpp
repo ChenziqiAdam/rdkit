@@ -8,8 +8,11 @@
 //  of the RDKit source tree.
 //
 #include "Normalize.h"
+#include <set>
 #include <string>
+#include <map>
 #include <GraphMol/RDKitBase.h>
+#include <GraphMol/SanitizerMol.h>
 #include <GraphMol/ChemReactions/Reaction.h>
 #include <GraphMol/ChemReactions/ReactionParser.h>
 #include <GraphMol/SmilesParse/SmilesWrite.h>
@@ -22,6 +25,40 @@
 #include <RDGeneral/BoostEndInclude.h>
 
 using namespace std;
+
+namespace {
+// RDK-MS-001 precondition: the default transform set, every member of which is
+// a formal isomerization (same atoms, same net charge). Template charge
+// primitives are not stored on query atoms, so the set is identified by name.
+bool transformsBalanced(
+    const std::vector<std::shared_ptr<RDKit::ChemicalReaction>> &transforms) {
+  static const std::set<std::string> defaults = {
+      "Azide to N=N+=N-",
+      "C/S+N to C/S=N+",
+      "Charge normalization",
+      "Charge recombination",
+      "Diazo/azo to =N+=N-",
+      "Nitro to N+(O-)=O",
+      "Normalize 1,3 conjugated cation",
+      "Normalize 1,5 conjugated cation",
+      "Normalize hydrazine-diazonium",
+      "P+N to P=N+",
+      "Phosphate to P(O-)=O",
+      "Pyridine oxide to n+O-",
+      "Recombine 1,3-separated charges",
+      "Recombine 1,5-separated charges",
+      "Sulfone to S(=O)(=O)",
+      "Sulfoxide to -S+(O-)-"};
+  for (const auto &t : transforms) {
+    std::string name;
+    if (!t->getPropIfPresent(RDKit::common_properties::_Name, name) ||
+        !defaults.count(name)) {
+      return false;
+    }
+  }
+  return !transforms.empty();
+}
+}  // namespace
 using namespace RDKit;
 
 namespace RDKit {
@@ -105,6 +142,9 @@ void Normalizer::normalizeInPlace(RWMol &mol) {
 
   const std::vector<std::shared_ptr<ChemicalReaction>> &transforms =
       tparams->getTransformations();
+  Sanitizer::CompositionGuard sanGuard(
+      "RDK-MS-001", mol, true, "normalizeInPlace",
+      Sanitizer::enabled() && transformsBalanced(transforms));
 
   // make the transforms are compatible with the
   // restrictions on in-place reactions
@@ -164,6 +204,10 @@ ROMol *Normalizer::normalize(const ROMol &mol) {
   }
   const std::vector<std::shared_ptr<ChemicalReaction>> &transforms =
       tparams->getTransformations();
+  Sanitizer::Composition sanBefore;
+  if (Sanitizer::enabled() && transformsBalanced(transforms)) {
+    sanBefore = Sanitizer::compose(mol, true);
+  }
   bool sanitizeFrags = false;
   MOL_SPTR_VECT frags = MolOps::getMolFrags(mol, sanitizeFrags);
   MOL_SPTR_VECT nfrags;  //( frags.size() );
@@ -180,6 +224,8 @@ ROMol *Normalizer::normalize(const ROMol &mol) {
     outmol = tmol;
     //		delete nfrag;
   }
+  Sanitizer::checkSameComposition("RDK-MS-001", sanBefore, *outmol, true,
+                                  "normalize");
   return outmol;
 }
 

@@ -9,8 +9,62 @@
 //
 #include "BoundsMatrix.h"
 #include "TriangleSmooth.h"
+#include <RDGeneral/Sanitizer.h>
+#include <algorithm>
+#include <string>
 
 namespace DistGeom {
+namespace {
+// RDK-DG-001..003 observation, run on a successfully smoothed matrix
+void sanitizeBounds(const BoundsMatrix &b, double tol) {
+  if (!RDKit::Sanitizer::enabled()) {
+    return;
+  }
+  const unsigned int n = b.numRows();
+  if (n > 150) {
+    return;
+  }
+  double maxU = 0.0;
+  for (unsigned int i = 0; i < n; ++i) {
+    for (unsigned int j = i + 1; j < n; ++j) {
+      maxU = std::max(maxU, b.getUpperBound(i, j));
+    }
+  }
+  // tol is relative (the smoothing code raises U to L within tol * L)
+  const double slack = 8 * 2.220446049250313e-16 * maxU + tol * maxU;
+  bool u = false, l = false, o = false;
+  std::string du, dl, dord;
+  for (unsigned int i = 0; i < n; ++i) {
+    for (unsigned int j = i + 1; j < n; ++j) {
+      if (!o && b.getLowerBound(i, j) > b.getUpperBound(i, j) + slack) {
+        o = true;
+        dord = "pair " + std::to_string(i) + "," + std::to_string(j);
+      }
+      for (unsigned int k = 0; k < n; ++k) {
+        if (k == i || k == j) {
+          continue;
+        }
+        if (!u && b.getUpperBound(i, j) >
+                      b.getUpperBound(i, k) + b.getUpperBound(k, j) + slack) {
+          u = true;
+          du = "triple " + std::to_string(i) + "," + std::to_string(j) + "," +
+               std::to_string(k);
+        }
+        if (!l && b.getLowerBound(i, j) <
+                      b.getLowerBound(i, k) - b.getUpperBound(k, j) - slack) {
+          l = true;
+          dl = "triple " + std::to_string(i) + "," + std::to_string(j) + "," +
+               std::to_string(k);
+        }
+      }
+    }
+  }
+  if (u) RDKit::Sanitizer::report("RDK-DG-001", du);
+  if (l) RDKit::Sanitizer::report("RDK-DG-002", dl);
+  if (o) RDKit::Sanitizer::report("RDK-DG-003", dord);
+}
+}  // namespace
+
 bool triangleSmoothBounds(BoundsMatPtr boundsMat, double tol) {
   return triangleSmoothBounds(boundsMat.get(), tol);
 }
@@ -66,6 +120,7 @@ bool triangleSmoothBounds(BoundsMatrix *boundsMat, double tol) {
       }
     }
   }
+  sanitizeBounds(*boundsMat, tol);
   return true;
 }
 }  // namespace DistGeom

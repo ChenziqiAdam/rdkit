@@ -8,6 +8,7 @@
 //  of the RDKit source tree.
 //
 #include "Metal.h"
+#include <GraphMol/SanitizerMol.h>
 #include <GraphMol/FileParsers/MolSGroupParsing.h>
 #include <GraphMol/SmilesParse/SmilesParse.h>
 #include <GraphMol/SmilesParse/SmilesWrite.h>
@@ -81,6 +82,8 @@ ROMol *MetalDisconnector::disconnect(const ROMol &mol) {
 
 void MetalDisconnector::disconnect(RWMol &mol) {
   BOOST_LOG(rdInfoLog) << "Running MetalDisconnector\n";
+  Sanitizer::CompositionGuard sanGuard("RDK-MS-006", mol, false,
+                                       "MetalDisconnector");
   std::list<ROMOL_SPTR> metalList = {dp_metal_nof, dp_metal_non};
   std::map<int, NonMetal> nonMetals;
   std::map<int, int> metalChargeExcess;

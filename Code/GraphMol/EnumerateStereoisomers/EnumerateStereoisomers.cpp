@@ -9,6 +9,7 @@
 //
 
 #include <cmath>
+#include <GraphMol/SanitizerMol.h>
 #include <limits>
 
 #include <boost/numeric/conversion/cast.hpp>
@@ -78,6 +79,9 @@ std::unique_ptr<ROMol> StereoisomerEnumerator::next() {
   else {
     auto isomer = generateRandomIsomer();
     ++d_numReturned;
+    if (isomer) {
+      Sanitizer::checkSameConstitution(d_mol, *isomer);
+    }
     return isomer;
   }
 }

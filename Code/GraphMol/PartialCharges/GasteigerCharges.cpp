@@ -12,6 +12,9 @@
 #include <GraphMol/RDKitBase.h>
 #include <GraphMol/ROMol.h>
 #include <GraphMol/MolOps.h>
+#include <RDGeneral/Sanitizer.h>
+#include <algorithm>
+#include <cmath>
 #include "GasteigerParams.h"
 
 namespace Gasteiger {
@@ -105,6 +108,12 @@ void computeGasteigerCharges(const ROMol &mol, std::vector<double> &charges,
   // deal with the conjugated system - distribute the formal charges on atoms of
   // same type in each conjugated system
   Gasteiger::splitChargeConjugated(mol, charges);
+  double sanQStart = 0.0;
+  if (RDKit::Sanitizer::enabled()) {
+    for (double q : charges) {
+      sanQStart += q;
+    }
+  }
 
   for (const auto atom : mol.atoms()) {
     const std::string elem = table->getElementSymbol(atom->getAtomicNum());
@@ -210,6 +219,16 @@ void computeGasteigerCharges(const ROMol &mol, std::vector<double> &charges,
     }
 
     damp *= DAMP_SCALE;
+  }
+
+  if (RDKit::Sanitizer::enabled()) {
+    double qEnd = 0.0, qmax = 0.0;
+    for (auto aix = 0u; aix < natms; ++aix) {
+      qEnd += charges[aix] + hChrg[aix];
+      qmax = std::max({qmax, std::fabs(charges[aix]), std::fabs(hChrg[aix])});
+    }
+    RDKit::Sanitizer::checkChargeConservation(sanQStart, qEnd, natms, nIter,
+                                              qmax);
   }
 
   for (auto atom : mol.atoms()) {

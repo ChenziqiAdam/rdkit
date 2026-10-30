@@ -8,6 +8,7 @@
 //  of the RDKit source tree.
 //
 #include <GraphMol/RDKitBase.h>
+#include <GraphMol/SanitizerMol.h>
 #include <GraphMol/Rings.h>
 #include <RDGeneral/RDLog.h>
 #include <RDGeneral/Exceptions.h>
@@ -988,6 +989,8 @@ int findSSSR(const ROMol &mol, VECT_INT_VECT &res, bool includeDativeBonds,
   // update the ring memberships of atoms and bonds in the molecule:
   // store the SSSR rings on the molecule as a property
   // we will ignore any existing SSSRs on the molecule - simply overwrite
+  Sanitizer::checkSSSR(mol, res, rdcast<int>(res.size()), includeDativeBonds,
+                       includeHydrogenBonds);
   return rdcast<int>(res.size());
 }
 

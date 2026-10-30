@@ -9,6 +9,7 @@
 //
 #include "Tautomer.h"
 #include "Fragment.h"
+#include <GraphMol/SanitizerMol.h>
 #include <GraphMol/MolStandardize/FragmentCatalog/FragmentCatalogUtils.h>
 #include <GraphMol/SmilesParse/SmilesParse.h>
 #include <GraphMol/SmilesParse/SmilesWrite.h>
@@ -903,6 +904,13 @@ TautomerEnumeratorResult TautomerEnumerator::enumerate(const ROMol &mol) const {
         << std::endl;
   }
 
+  if (Sanitizer::enabled()) {
+    const auto before = Sanitizer::compose(mol, true);
+    for (const auto &t : res.tautomers()) {
+      Sanitizer::checkSameComposition("RDK-MS-004", before, *t, true,
+                                      "tautomer");
+    }
+  }
   return res;
 }
 
@@ -990,6 +998,10 @@ ROMol *TautomerEnumerator::canonicalize(
   for (auto confIt = mol.beginConformers(); confIt != mol.endConformers();
        ++confIt) {
     canonical->addConformer(new Conformer(**confIt), true);
+  }
+  if (Sanitizer::enabled()) {
+    Sanitizer::checkSameComposition("RDK-MS-005", Sanitizer::compose(mol, true),
+                                    *canonical, true, "canonicalize");
   }
   return canonical;
 }

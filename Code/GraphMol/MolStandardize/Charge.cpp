@@ -13,6 +13,7 @@
 #include <GraphMol/SmilesParse/SmilesWrite.h>
 #include <GraphMol/new_canon.h>
 #include <GraphMol/RDKitBase.h>
+#include <GraphMol/SanitizerMol.h>
 #include <GraphMol/Substruct/SubstructMatch.h>
 #include <boost/range/adaptor/reversed.hpp>
 #include <RDGeneral/BoostStartInclude.h>
@@ -102,6 +103,10 @@ ROMol *Reionizer::reionize(const ROMol &mol) {
 }
 
 void Reionizer::reionizeInPlace(RWMol &mol) {
+  if (mol.needsUpdatePropertyCache()) {
+    mol.updatePropertyCache(false);
+  }
+  Sanitizer::CompositionGuard sanGuard("RDK-MS-002", mol, true, "reionize");
   PRECONDITION(this->d_abcat, "");
   const AcidBaseCatalogParams *abparams = this->d_abcat->getCatalogParams();
 
@@ -377,6 +382,7 @@ void Uncharger::unchargeInPlace(RWMol &mol) {
   if (mol.needsUpdatePropertyCache()) {
     mol.updatePropertyCache(false);
   }
+  Sanitizer::ProtonGuard sanGuard(mol);
   std::vector<MatchVectType> p_matches;
   std::vector<MatchVectType> q_matches;
   std::vector<MatchVectType> n_matches;

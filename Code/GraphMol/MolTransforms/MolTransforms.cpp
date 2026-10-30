@@ -28,6 +28,9 @@
 #ifndef RDK_HAS_EIGEN3
 constexpr double EIGEN_TOLERANCE = 5.0e-2;
 #endif
+#include <RDGeneral/Sanitizer.h>
+#include <algorithm>
+#include <cmath>
 namespace MolTransforms {
 
 using namespace RDKit;
@@ -225,6 +228,18 @@ bool computePrincipalAxesAndMoments(const RDKit::Conformer &conf,
   if (!getEigenValEigenVectHelper(axes, moments, sumXX, sumXY, sumXZ, sumYY,
                                   sumYZ, sumZZ)) {
     return false;
+  }
+
+  if (RDKit::Sanitizer::enabled()) {
+    bool nonneg = true;
+    if (weights) {
+      for (double w : *weights) {
+        nonneg = nonneg && w >= 0.0;
+      }
+    }
+    if (nonneg) {
+      RDKit::Sanitizer::checkInertia(moments.data(), axes.data());
+    }
   }
 
   if (!weights) {
@@ -432,10 +447,40 @@ RDGeom::Transform3D *computeCanonicalTransform(const Conformer &conf,
 
 void canonicalizeConformer(Conformer &conf, const RDGeom::Point3D *center,
                            bool normalizeCovar, bool ignoreHs) {
+  const bool sanitize = RDKit::Sanitizer::enabled();
+  std::vector<RDGeom::Point3D> sanOrig;
+  if (sanitize) {
+    const ROMol &m = conf.getOwningMol();
+    for (const auto atom : m.atoms()) {
+      if (!(ignoreHs && atom->getAtomicNum() == 1)) {
+        sanOrig.push_back(conf.getAtomPos(atom->getIdx()));
+      }
+    }
+  }
   RDGeom::Transform3D *trans =
       computeCanonicalTransform(conf, center, normalizeCovar, ignoreHs);
   transformConformer(conf, *trans);
   delete trans;
+  if (sanitize) {
+    const ROMol &m = conf.getOwningMol();
+    std::vector<std::vector<double>> pos;
+    double origScale = 0.0, origNorm = 0.0;
+    size_t k = 0;
+    for (const auto atom : m.atoms()) {
+      if (ignoreHs && atom->getAtomicNum() == 1) {
+        continue;
+      }
+      const auto &p = conf.getAtomPos(atom->getIdx());
+      pos.push_back({p.x, p.y, p.z});
+      // rounding enters through both the original and the new magnitudes
+      const double s = sanOrig[k].length() + p.length();
+      origNorm += s;
+      origScale += s * s;
+      ++k;
+    }
+    RDKit::Sanitizer::checkCanonicalFrame(pos, origScale, origNorm,
+                                          center == nullptr);
+  }
 }
 
 void canonicalizeMol(RDKit::ROMol &mol, bool normalizeCovar, bool ignoreHs) {

@@ -33,6 +33,7 @@
 //
 
 #include <GraphMol/ChemReactions/Reaction.h>
+#include <GraphMol/SanitizerMol.h>
 #include <GraphMol/Substruct/SubstructMatch.h>
 #include <GraphMol/QueryOps.h>
 #include <boost/dynamic_bitset.hpp>
@@ -1600,6 +1601,70 @@ void traverseToFindAtomsToRemove(const ROMol &reactant, const ROMol &templ,
 
 }  // namespace ReactionRunnerUtils
 
+namespace {
+// RDK-RX-001 precondition: every template atom is mapped one-to-one between
+// reactant and product templates with the same element and formal charge
+bool sanBalancedTemplates(const ChemicalReaction &rxn) {
+  std::map<int, std::pair<int, int>> reac;
+  for (auto it = rxn.beginReactantTemplates(); it != rxn.endReactantTemplates();
+       ++it) {
+    for (const auto a : (*it)->atoms()) {
+      int map = 0;
+      if (!a->getPropIfPresent(common_properties::molAtomMapNumber, map) ||
+          map <= 0 || a->getAtomicNum() == 0 || reac.count(map)) {
+        return false;
+      }
+      reac[map] = {a->getAtomicNum(), a->getFormalCharge()};
+    }
+  }
+  size_t nprod = 0;
+  for (auto it = rxn.beginProductTemplates(); it != rxn.endProductTemplates();
+       ++it) {
+    for (const auto a : (*it)->atoms()) {
+      int map = 0;
+      ++nprod;
+      if (!a->getPropIfPresent(common_properties::molAtomMapNumber, map) ||
+          !reac.count(map) ||
+          reac[map] != std::make_pair(a->getAtomicNum(), a->getFormalCharge())) {
+        return false;
+      }
+    }
+  }
+  return nprod == reac.size();
+}
+void sanCheckReaction(const ChemicalReaction &rxn,
+                      const MOL_SPTR_VECT &reactants,
+                      const std::vector<MOL_SPTR_VECT> &products) {
+  if (!Sanitizer::enabled() || products.empty() || !sanBalancedTemplates(rxn)) {
+    return;
+  }
+  Sanitizer::Composition r;
+  r.valid = true;
+  for (const auto &m : reactants) {
+    if (MolOps::getMolFrags(*m).size() != 1) {
+      return;
+    }
+    auto c = Sanitizer::compose(*m, false);
+    for (auto &kv : c.n) r.n[kv.first] += kv.second;
+    r.charge += c.charge;
+  }
+  for (const auto &set : products) {
+    Sanitizer::Composition p;
+    p.valid = true;
+    for (const auto &m : set) {
+      auto c = Sanitizer::compose(*m, false);
+      for (auto &kv : c.n) p.n[kv.first] += kv.second;
+      p.charge += c.charge;
+    }
+    if (p.n != r.n || p.charge != r.charge) {
+      Sanitizer::report("RDK-RX-001",
+                        "product set differs from reactants in element counts or net charge");
+      return;
+    }
+  }
+}
+}  // namespace
+
 std::vector<MOL_SPTR_VECT> run_Reactants(const ChemicalReaction &rxn,
                                          const MOL_SPTR_VECT &reactants,
                                          unsigned int maxProducts) {
@@ -1647,6 +1712,7 @@ std::vector<MOL_SPTR_VECT> run_Reactants(const ChemicalReaction &rxn,
     productMols[productId] = lProds;
   }
 
+  sanCheckReaction(rxn, reactants, productMols);
   return productMols;
 }  // end of ChemicalReaction::runReactants()
 

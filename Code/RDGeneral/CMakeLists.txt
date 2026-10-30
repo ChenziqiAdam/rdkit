@@ -12,7 +12,7 @@ endif (NOT EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/enum.h)
 
 rdkit_library(RDGeneral
         Invariant.cpp types.cpp utils.cpp RDGeneralExceptions.cpp RDLog.cpp
-        LocaleSwitcher.cpp versions.cpp SHARED)
+        LocaleSwitcher.cpp versions.cpp Sanitizer.cpp SHARED)
 target_compile_definitions(RDGeneral PRIVATE RDKIT_RDGENERAL_BUILD)
 
 if (RDK_USE_BOOST_STACKTRACE AND UNIX AND NOT APPLE)
@@ -24,6 +24,7 @@ target_link_libraries(RDGeneral PUBLIC ${RDKit_THREAD_LIBS} ${EXTRA_STACKTRACE_L
 
 
 rdkit_headers(Exceptions.h
+        Sanitizer.h
         BadFileException.h
         BoostStartInclude.h
         BoostEndInclude.h

@@ -8,6 +8,7 @@
 //  of the RDKit source tree.
 //
 #include <GraphMol/GraphMol.h>
+#include <GraphMol/SanitizerMol.h>
 #include <GraphMol/MolOps.h>
 #include <GraphMol/Atom.h>
 #include <GraphMol/AtomIterators.h>
@@ -313,6 +314,7 @@ void metalBondCleanup(RWMol &mol, Atom *atom,
 }  // namespace
 
 void cleanUp(RWMol &mol) {
+  Sanitizer::CompositionGuard sanGuard("RDK-MO-003", mol, false, "cleanUp");
   nitrogensCleanup(mol);
   for (auto atom : mol.atoms()) {
     switch (atom->getAtomicNum()) {
