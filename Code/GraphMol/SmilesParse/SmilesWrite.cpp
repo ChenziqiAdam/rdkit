@@ -784,7 +784,9 @@ void sanitizeSmiles(const ROMol &mol, const SmilesWriteParams &params,
     // CN-001: the SMILES describes the same atoms, bonds and charge
     const auto before = Sanitizer::compose(mol, true);
     if (before.valid) {
-      std::unique_ptr<ROMol> back(SmilesToMol(smi));
+      SmilesParserParams pp;
+      pp.removeHs = false;  // explicit hydrogen atoms stay atoms
+      std::unique_ptr<ROMol> back(SmilesToMol(smi, pp));
       if (back) {
         const auto after = Sanitizer::compose(*back, true);
         if (after.valid &&
