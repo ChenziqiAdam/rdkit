@@ -68,8 +68,10 @@ void report(const char *id, const std::string &detail) {
     return;
   }
   if (FILE *f = std::fopen(logPath(), "a")) {
-    std::fprintf(f, "{\"id\":\"%s\",\"detail\":\"%s\"}\n", id,
-                 jsonEscape(detail).c_str());
+    // the scorer sets RDKIT_SANITIZE_KEY per run; records without it are forgeries
+    static const char *key = std::getenv("RDKIT_SANITIZE_KEY");
+    std::fprintf(f, "{\"id\":\"%s\",\"key\":\"%s\",\"detail\":\"%s\"}\n", id,
+                 key ? jsonEscape(key).c_str() : "", jsonEscape(detail).c_str());
     std::fclose(f);
   }
 }
