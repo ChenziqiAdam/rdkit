@@ -82,9 +82,24 @@ ROMol *MetalDisconnector::disconnect(const ROMol &mol) {
 
 void MetalDisconnector::disconnect(RWMol &mol) {
   BOOST_LOG(rdInfoLog) << "Running MetalDisconnector\n";
-  Sanitizer::CompositionGuard sanGuard("RDK-MS-006", mol, false,
-                                       "MetalDisconnector");
   std::list<ROMOL_SPTR> metalList = {dp_metal_nof, dp_metal_non};
+  // precondition: ligand atoms bonded to a metal are neutral; the
+  // disconnector recomputes ligand charges on purpose ("the original formal
+  // charge is often wrong"), so charge is conserved only for neutral ligands
+  bool sanNeutralLigands = Sanitizer::enabled();
+  if (sanNeutralLigands) {
+    for (auto &query : metalList) {
+      std::vector<MatchVectType> matches;
+      SubstructMatch(mol, *query, matches);
+      for (const auto &match : matches) {
+        if (mol.getAtomWithIdx(match[1].second)->getFormalCharge() != 0) {
+          sanNeutralLigands = false;
+        }
+      }
+    }
+  }
+  Sanitizer::CompositionGuard sanGuard("RDK-MS-006", mol, false,
+                                       "MetalDisconnector", sanNeutralLigands);
   std::map<int, NonMetal> nonMetals;
   std::map<int, int> metalChargeExcess;
   for (auto &query : metalList) {

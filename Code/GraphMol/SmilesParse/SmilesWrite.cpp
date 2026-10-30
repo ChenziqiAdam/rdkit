@@ -762,7 +762,7 @@ namespace {
 void sanitizeSmiles(const ROMol &mol, const SmilesWriteParams &params,
                     const std::string &smi) {
   static thread_local bool inside = false;
-  if (inside || !Sanitizer::enabled() || !params.canonical || params.doRandom ||
+  if (inside || !Sanitizer::enabled() || Sanitizer::insideInternal() || !params.canonical || params.doRandom ||
       params.rootedAtAtom >= 0 || mol.getNumAtoms() == 0 ||
       mol.getNumAtoms() > 100 || smi.empty()) {
     return;

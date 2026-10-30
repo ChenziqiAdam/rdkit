@@ -588,6 +588,7 @@ unsigned int getNonProtectedMatches(
 }
 
 TautomerEnumeratorResult TautomerEnumerator::enumerate(const ROMol &mol) const {
+  Sanitizer::InternalScope sanScope;
 #ifdef VERBOSE_ENUMERATION
   std::cout << "**********************************" << std::endl;
 #endif
@@ -973,6 +974,7 @@ ROMol *TautomerEnumerator::pickCanonical(
 
 ROMol *TautomerEnumerator::canonicalize(
     const ROMol &mol, boost::function<int(const ROMol &mol)> scoreFunc) const {
+  Sanitizer::InternalScope sanScope;
   auto thisCopy = TautomerEnumerator(*this);
   thisCopy.setReassignStereo(false);
   auto res = thisCopy.enumerate(mol);
@@ -1008,6 +1010,7 @@ ROMol *TautomerEnumerator::canonicalize(
 
 void TautomerEnumerator::canonicalizeInPlace(
     RWMol &mol, boost::function<int(const ROMol &mol)> scoreFunc) const {
+  Sanitizer::InternalScope sanScope;
   auto thisCopy = TautomerEnumerator(*this);
   thisCopy.setReassignStereo(false);
   auto res = thisCopy.enumerate(mol);

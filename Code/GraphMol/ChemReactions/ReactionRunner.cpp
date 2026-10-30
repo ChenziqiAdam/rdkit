@@ -1649,6 +1649,24 @@ void sanCheckReaction(const ChemicalReaction &rxn,
     r.charge += c.charge;
   }
   for (const auto &set : products) {
+    // a reactant atom reached from more than one product template (cleaved
+    // ring bond) is copied into several products by design
+    {
+      std::map<unsigned int, size_t> seen;
+      bool copied = false;
+      for (const auto &m : set) {
+        for (const auto a : m->atoms()) {
+          unsigned int idx = 0;
+          if (a->getPropIfPresent(common_properties::reactantAtomIdx, idx) &&
+              ++seen[idx] > reactants.size()) {
+            copied = true;
+          }
+        }
+      }
+      if (copied) {
+        continue;
+      }
+    }
     Sanitizer::Composition p;
     p.valid = true;
     for (const auto &m : set) {

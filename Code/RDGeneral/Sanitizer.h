@@ -18,6 +18,19 @@ namespace Sanitizer {
 //! true when RDKIT_SANITIZE_LOG is set (evaluated once)
 RDKIT_RDGENERAL_EXPORT bool enabled();
 
+//! calls made by library code on its own intermediate molecules, which a user
+//! never sees; observation of user-visible canonical forms is skipped inside
+RDKIT_RDGENERAL_EXPORT void enterInternal();
+RDKIT_RDGENERAL_EXPORT void leaveInternal();
+RDKIT_RDGENERAL_EXPORT bool insideInternal();
+class InternalScope {
+ public:
+  InternalScope() { enterInternal(); }
+  ~InternalScope() { leaveInternal(); }
+  InternalScope(const InternalScope &) = delete;
+  InternalScope &operator=(const InternalScope &) = delete;
+};
+
 //! append one alarm record {"id","detail"}; no-op when disabled
 RDKIT_RDGENERAL_EXPORT void report(const char *id, const std::string &detail);
 

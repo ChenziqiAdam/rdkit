@@ -1028,8 +1028,22 @@ void removeHs(RWMol &mol, const RemoveHsParameters &ps, bool sanitize) {
   for (auto atom : mol.atoms()) {
     atom->updatePropertyCache(false);
   }
+  // precondition: every explicit hydrogen hangs on an atom that can take it
+  // as an implicit hydrogen (isolated H atoms, H ions, H2 and H on dummy atoms
+  // are deleted by design)
+  bool sanAbsorbable = sanitize && Sanitizer::enabled();
+  if (sanAbsorbable) {
+    for (const auto atom : mol.atoms()) {
+      if (atom->getAtomicNum() == 1 &&
+          (atom->getDegree() != 1 ||
+           (*mol.atomNeighbors(atom).begin())->getAtomicNum() <= 1)) {
+        sanAbsorbable = false;
+        break;
+      }
+    }
+  }
   Sanitizer::CompositionGuard sanGuard("RDK-MO-002", mol, true, "removeHs",
-                                       sanitize);
+                                       sanAbsorbable);
   if (ps.removeAndTrackIsotopes) {
     for (const auto &pair : getIsoMap(mol)) {
       mol.getAtomWithIdx(pair.first)

@@ -58,6 +58,13 @@ bool enabled() {
   return p != nullptr && *p != '\0';
 }
 
+namespace {
+thread_local int internalDepth = 0;
+}
+void enterInternal() { ++internalDepth; }
+void leaveInternal() { --internalDepth; }
+bool insideInternal() { return internalDepth > 0; }
+
 void report(const char *id, const std::string &detail) {
   if (!enabled()) {
     return;
