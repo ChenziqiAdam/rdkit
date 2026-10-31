@@ -3,6 +3,7 @@
 //
 #include "SanitizerMol.h"
 #include <GraphMol/RDKitBase.h>
+#include <GraphMol/QueryOps.h>
 #include <algorithm>
 #include <cmath>
 #include <iterator>
@@ -105,6 +106,11 @@ void checkKekulizeValences(const Valences &before, const ROMol &after) {
     return;
   }
   for (const auto atom : after.atoms()) {
+    // a metal has no fixed valence: its aromatic ring bonds (e.g. set by the
+    // MMFF perception on a chelate) are not kekulized into integer orders
+    if (QueryOps::isMetal(*atom)) {
+      continue;
+    }
     double sum = 0.0;
     for (const auto bond : after.atomBonds(atom)) {
       sum += bond->getValenceContrib(atom);

@@ -171,7 +171,13 @@ void checkAlignment(const std::vector<std::vector<double>> &prb,
   for (int d = 0; d < 3; ++d) {
     off += (cp[d] - cr[d]) * (cp[d] - cr[d]);
   }
-  const double tol = 256 * EPS * (mp + mr + off + 0.0);
+  // rounding in the uncentred sums scales with the squared distance of the
+  // coordinates from the origin
+  double absC = 0.0;
+  for (int d = 0; d < 3; ++d) {
+    absC += cp[d] * cp[d] + cr[d] * cr[d];
+  }
+  const double tol = 256 * EPS * (mp + mr + off + absC);
   auto apply = [&](const V3 &p) {
     V3 q;
     for (int i = 0; i < 3; ++i) {
