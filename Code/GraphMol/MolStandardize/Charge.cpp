@@ -106,7 +106,21 @@ void Reionizer::reionizeInPlace(RWMol &mol) {
   if (mol.needsUpdatePropertyCache()) {
     mol.updatePropertyCache(false);
   }
-  Sanitizer::CompositionGuard sanGuard("RDK-MS-002", mol, true, "reionize");
+  // precondition: no isolated neutral Li/Na/K/Mg/Ca/Cl atom; the charge
+  // corrections charge those on purpose (and only an acid can offset it)
+  bool sanNoCorrection = Sanitizer::enabled();
+  if (sanNoCorrection) {
+    for (const auto atom : mol.atoms()) {
+      switch (atom->getAtomicNum()) {
+        case 3: case 11: case 12: case 17: case 19: case 20:
+          if (atom->getDegree() == 0 && atom->getFormalCharge() == 0) {
+            sanNoCorrection = false;
+          }
+      }
+    }
+  }
+  Sanitizer::CompositionGuard sanGuard("RDK-MS-002", mol, true, "reionize",
+                                       sanNoCorrection);
   PRECONDITION(this->d_abcat, "");
   const AcidBaseCatalogParams *abparams = this->d_abcat->getCatalogParams();
 

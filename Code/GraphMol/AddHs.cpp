@@ -1030,12 +1030,13 @@ void removeHs(RWMol &mol, const RemoveHsParameters &ps, bool sanitize) {
   }
   // precondition: every explicit hydrogen hangs on an atom that can take it
   // as an implicit hydrogen (isolated H atoms, H ions, H2 and H on dummy atoms
-  // are deleted by design)
+  // are deleted by design, and a charge carried by the H itself is dropped
+  // when the user asks for it to be removed)
   bool sanAbsorbable = sanitize && Sanitizer::enabled();
   if (sanAbsorbable) {
     for (const auto atom : mol.atoms()) {
       if (atom->getAtomicNum() == 1 &&
-          (atom->getDegree() != 1 ||
+          (atom->getFormalCharge() != 0 || atom->getDegree() != 1 ||
            (*mol.atomNeighbors(atom).begin())->getAtomicNum() <= 1)) {
         sanAbsorbable = false;
         break;
