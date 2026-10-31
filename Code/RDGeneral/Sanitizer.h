@@ -50,7 +50,7 @@ RDKIT_RDGENERAL_EXPORT void checkEnergyDescent(double e0, double e1);
 RDKIT_RDGENERAL_EXPORT void checkAlignment(
     const std::vector<std::vector<double>> &prb,
     const std::vector<std::vector<double>> &ref, const double *trans,
-    bool reflect, double msd);
+    bool reflect, double msd, bool fullSolve = true);
 
 //! RDK-MT-001/002; moments ascending, axes column-major 3x3 eigenvectors
 RDKIT_RDGENERAL_EXPORT void checkInertia(const double *moments,

@@ -1657,9 +1657,17 @@ void sanCheckReaction(const ChemicalReaction &rxn,
       for (const auto &m : set) {
         for (const auto a : m->atoms()) {
           unsigned int idx = 0;
-          if (a->getPropIfPresent(common_properties::reactantAtomIdx, idx) &&
-              ++seen[idx] > reactants.size()) {
-            copied = true;
+          if (a->getPropIfPresent(common_properties::reactantAtomIdx, idx)) {
+            // an atom index can be hit once per reactant that has that atom
+            size_t limit = 0;
+            for (const auto &r : reactants) {
+              if (r->getNumAtoms() > idx) {
+                ++limit;
+              }
+            }
+            if (++seen[idx] > limit) {
+              copied = true;
+            }
           }
         }
       }

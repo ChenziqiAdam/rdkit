@@ -169,6 +169,20 @@ void sanitizeGradient(const ForceField &ff, const double *posIn) {
       return;
     }
   }
+  // coincident points put angle and inversion terms in their regularised
+  // regime, where the returned gradient is not the energy derivative
+  for (unsigned int i = 0; i < P; ++i) {
+    for (unsigned int j = i + 1; j < P; ++j) {
+      double d2 = 0.0;
+      for (int d = 0; d < 3; ++d) {
+        d2 += (posIn[3 * i + d] - posIn[3 * j + d]) *
+              (posIn[3 * i + d] - posIn[3 * j + d]);
+      }
+      if (d2 < 1e-4) {
+        return;
+      }
+    }
+  }
   std::vector<double> pos(posIn, posIn + 3 * P), tot(3 * P, 0.0), g(3 * P);
   double cen[3] = {0, 0, 0};
   for (unsigned int i = 0; i < P; ++i) {
@@ -328,6 +342,10 @@ int ForceField::minimize(unsigned int snapshotFreq,
 
   this->scatter(points.data());
   const bool sanitize = RDKit::Sanitizer::enabled();
+  if (sanitize) {
+    // contributions read a distance cache left by the previous evaluation
+    this->initDistanceMatrix();
+  }
   const double e0 = sanitize ? sanitizeEnergy(*this, points) : 0.0;
   ForceFieldsHelper::calcEnergy eCalc(this);
   ForceFieldsHelper::calcGradient gCalc(this);
@@ -337,6 +355,7 @@ int ForceField::minimize(unsigned int snapshotFreq,
                               snapshotVect, energyTol, maxIts);
   this->gather(points.data());
   if (sanitize) {
+    this->initDistanceMatrix();
     RDKit::Sanitizer::checkEnergyDescent(e0, sanitizeEnergy(*this, points));
   }
 

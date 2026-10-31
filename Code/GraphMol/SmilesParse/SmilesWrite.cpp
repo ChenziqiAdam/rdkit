@@ -773,9 +773,7 @@ void sanitizeSmiles(const ROMol &mol, const SmilesWriteParams &params,
     }
   }
   for (const auto b : mol.bonds()) {
-    if (b->hasQuery() || b->getBondType() == Bond::DATIVE ||
-        b->getBondType() == Bond::DATIVEONE ||
-        b->getBondType() == Bond::HYDROGEN) {
+    if (b->hasQuery() || isDative(*b) || b->getBondType() == Bond::HYDROGEN) {
       return;
     }
   }

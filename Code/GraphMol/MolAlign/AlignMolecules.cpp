@@ -76,7 +76,8 @@ double alignConfsOnAtomMap(const Conformer &prbCnf, const Conformer &refCnf,
       prb.push_back({prbPoints[i]->x, prbPoints[i]->y, prbPoints[i]->z});
       ref.push_back({refPoints[i]->x, refPoints[i]->y, refPoints[i]->z});
     }
-    RDKit::Sanitizer::checkAlignment(prb, ref, trans.getData(), reflect, msd);
+    RDKit::Sanitizer::checkAlignment(prb, ref, trans.getData(), reflect, msd,
+                                   maxIterations >= 50);
   }
   return msd;
 }

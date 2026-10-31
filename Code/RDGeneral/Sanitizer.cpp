@@ -128,7 +128,7 @@ void checkEnergyDescent(double e0, double e1) {
 
 void checkAlignment(const std::vector<std::vector<double>> &prb,
                     const std::vector<std::vector<double>> &ref,
-                    const double *t, bool reflect, double msd) {
+                    const double *t, bool reflect, double msd, bool fullSolve) {
   if (!enabled() || prb.size() != ref.size() || prb.empty() ||
       !std::isfinite(msd)) {
     return;
@@ -196,7 +196,8 @@ void checkAlignment(const std::vector<std::vector<double>> &prb,
   if (std::fabs(msd - msd2) > tol) {
     report("RDK-AL-002", "reported msd " + num(msd) + " recomputed " + num(msd2));
   }
-  if (reflect) {
+  // a capped eigen-solver (small maxIterations) is suboptimal by design
+  if (reflect || !fullSolve) {
     return;
   }
   // local optimality over 64 fixed-seed small rotations about the centroid

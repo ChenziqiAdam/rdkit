@@ -50,8 +50,10 @@ void sanitizeBounds(const BoundsMatrix &b, double tol) {
           du = "triple " + std::to_string(i) + "," + std::to_string(j) + "," +
                std::to_string(k);
         }
-        if (!l && b.getLowerBound(i, j) <
-                      b.getLowerBound(i, k) - b.getUpperBound(k, j) - slack) {
+        if (!l && (b.getLowerBound(i, j) <
+                       b.getLowerBound(i, k) - b.getUpperBound(k, j) - slack ||
+                   b.getLowerBound(i, j) <
+                       b.getLowerBound(j, k) - b.getUpperBound(k, i) - slack)) {
           l = true;
           dl = "triple " + std::to_string(i) + "," + std::to_string(j) + "," +
                std::to_string(k);

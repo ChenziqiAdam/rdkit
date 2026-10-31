@@ -147,8 +147,11 @@ void checkSSSR(const ROMol &mol, const VECT_INT_VECT &rings, int count,
     return x;
   };
   auto counted = [&](const Bond *b) {
-    if (b->getBondType() == Bond::DATIVE ||
-        b->getBondType() == Bond::DATIVEONE) {
+    // ring perception ignores zero-order bonds
+    if (b->getBondType() == Bond::ZERO) {
+      return false;
+    }
+    if (isDative(*b)) {
       return includeDative;
     }
     if (b->getBondType() == Bond::HYDROGEN) {
